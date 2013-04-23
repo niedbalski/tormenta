@@ -1,0 +1,10 @@
+act-as-executable==1.0
+argparse==1.2.1
+distribute==0.6.24
+envoy==0.0.2
+ipython==0.13.2
+lxc4u==0.0.4
+overlay4u==0.0.4
+pylxc==0.0.3
+subwrap==0.1.0
+wsgiref==0.1.2
