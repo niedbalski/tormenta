@@ -1,12 +1,17 @@
 node:
         tracker:   [  "master.node.pyrosome.org:5392" ]
+
         key: '/home/user/public.key'
+
         rest:
             port: 8080
             notifications: true
             token: true
 
+        database:
+            uri: 'tormenta.db'
 resources:
+
         disk:
             limit: 4096
             type: 'lvm | image'
@@ -14,6 +19,7 @@ resources:
                 volume: 'vol01'
             image:
                 path: '/images'
+
         cpu: 
             cores: [ 0, 1, 2 ]
             limit:

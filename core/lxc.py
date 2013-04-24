@@ -9,14 +9,23 @@ from act_as_executable import act_as_executable
 import logging
 
 
+INSTANCE_STATES = {
+    'RUNNING': 0,
+    'FROZEN': 1,
+    'READY': 2,
+    'STARTING': 3,
+    'STARTED': 4,
+    'STOPPED': 5,
+    'STOPPING':6
+}
+
+
 class LXC:
     """
       LXC wrapper
     """
-    DEFAULT_RUN_TIMEOUT = 3
- 
-    ( RUNNING, FROZEN, 
-      READY, STARTING, STARTED, STOPPING, STOPPED ) = xrange(0, 7)    
+    DEFAULT_RUN_TIMEOUT = 10
+
 
     def __init__(self):
         self.logger = logging.getLogger(self.__class__.__name__)    
@@ -26,7 +35,7 @@ class LXC:
         Parse the lxc-list command output and produce a dict
         indexed by machine state
         '''
-        lines = filter(lambda l: l not in (None, ''), 
+        lines = filter(lambda l: l not in (None, ''),
                     [ x.strip(' ') for x in value.splitlines()])
 
         def get_state_idx(lines):
@@ -51,7 +60,7 @@ class LXC:
         print args, results
 
     @act_as_executable('lxc-freeze --name $args_0')
-    def freeze(self, *args, **results):        
+    def freeze(self, *args, **results):
         print "instance_id:%s , %s" % (instance_id, kwargs)
 
     @act_as_executable('lxc-unfreeze --name $args_0')

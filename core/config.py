@@ -3,12 +3,14 @@
 
 __author__ = 'Jorge Niedbalski R. <jnr@pyrosome.org>'
 
+from peewee import SqliteDatabase
+
 import yaml
 import logging
 import os
 
 _HERE = os.path.abspath(os.path.dirname(__file__))
-
+_DEFAULT_CONFIG = os.path.join(_HERE, 'config.yml')
 
 class Resource(object):
     def __init__(self, name):
@@ -45,6 +47,16 @@ class TrackerHandler:
     def __init__(self, options):
         self.options = options
 
+class DataBaseHandler:
+    def __init__(self, options):
+        if not 'uri' in options:
+            raise ConfigException('Please specify a uri path for your database')
+        try:
+            self.conn = SqliteDatabase(options['uri'])
+        except Exception as ex:
+            raise ConfigException('Invalid provided database %s' % 
+                                  options['uri'])
+
 class RestHandler(ConfigResource):
 
     _required = [ ('port', int), 
@@ -57,27 +69,34 @@ class RestHandler(ConfigResource):
 
 class NodeHandler(ConfigResource):
     _required = [ ('tracker', TrackerHandler),
-                 ('key', KeyHandler),
-                 ('rest', RestHandler) ]
+                  ('database', DataBaseHandler),
+                  ('key', KeyHandler),
+                  ('rest', RestHandler) ]
 
     def __init__(self, options):
         ConfigResource.__init__(self, options)
 
 
 class Config(object):
-
+    """
+    Main configuration handler
+    """
     DEFAULT_MEMORY_SIZE = 512.00
     DEFAULT_CPU_CORES = [ 0 ]
     DEFAULT_SWAP_SIZE = 512.00
     DEFAULT_DISK_SIZE =  1024.00
     DEFAULT_CPU_SHARES = 2048.00
 
-    ( DEFAULT_NETWORK_IN, DEFAULT_NETWORK_OUT ) = ( 1024.00, 1024.00 )
+    ( DEFAULT_NETWORK_IN, 
+      DEFAULT_NETWORK_OUT ) = ( 1024.00, 1024.00 )
 
     _required = [ 'resources', 'node' ]
 
-    def __init__(self, path):
+    def __init__(self, path=None):
 
+        if not path:
+            path = _DEFAULT_CONFIG
+            
         with open(path) as configuration:
             self._config = yaml.load(configuration.read())
 
@@ -85,6 +104,7 @@ class Config(object):
             if not required in self._config:
                 raise ConfigException('Invalid configuration: '
                                       '%s section not found' % required)
+
         self.load_resources(self._config['resources'].items())
         self.load_node(self._config['node'])
 
@@ -217,3 +237,6 @@ class Config(object):
         self._disk = self.iterate_options(self._disk, options,
                                                 skip=('limit'))
         return self._disk
+
+
+settings = Config()
