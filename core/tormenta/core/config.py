@@ -3,6 +3,7 @@
 
 __author__ = 'Jorge Niedbalski R. <jnr@pyrosome.org>'
 
+
 from peewee import SqliteDatabase
 
 import yaml
@@ -25,6 +26,7 @@ class ConfigResource(object):
     _required = []
 
     def __init__(self, options):
+        self.logger = logging.getLogger('tormenta.core.config')
         self.validate(options)
 
     def validate(self, options):
@@ -39,9 +41,10 @@ class ConfigResource(object):
 
 
 class KeyHandler:
-    def __init__(self, options):
-        self.path = options
-
+    def __init__(self, path):
+        if not os.path.exists(path):
+            raise ConfigException('Not found required key %s' % path)
+        self.path = path
 
 class TrackerHandler:
     def __init__(self, options):

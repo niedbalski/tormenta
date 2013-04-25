@@ -1,8 +1,6 @@
 node:
         tracker:   [  "master.node.pyrosome.org:5392" ]
-
-        key: '/home/user/public.key'
-
+        key: '/home/aktive/.ssh/openstack.pub'
         rest:
             port: 8080
             notifications: true

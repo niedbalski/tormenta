@@ -5,6 +5,7 @@ __author__ = 'Jorge Niedbalski R. <jnr@pyrosome.org>'
 
 import logging
 import datetime
+import hashlib
 
 from .lxc import INSTANCE_STATES
 from .config import settings
@@ -23,12 +24,22 @@ class BaseModel(Model):
 
 
 class Agent(BaseModel):
-    public_key = TextField()    
-
+    public_key = TextField() 
     
 class Tracker(BaseModel):
-    public_key = TextField()
+    public_key = CharField(primary_key=True)
 
+    @classmethod
+    def get_or_create(cls, path):
+
+        with open(path) as public_key:
+            readed = public_key.read()
+        hashed = hashlib.sha256(readed).hexdigest()
+        try:
+            tracker = cls.get(Tracker.public_key == hashed)
+        except:
+            tracker = cls.create(public_key=hashed)
+        return tracker
 
 class TrackerAgent(BaseModel):
     agent = ForeignKeyField(Agent)
@@ -40,11 +51,11 @@ class Token(BaseModel):
     created = DateTimeField(default=datetime.datetime.now)
     valid_until = DateTimeField(default=datetime.datetime.now() + 
                                 datetime.timedelta(days=30))
-    agent = ForeignKeyField(Agent, related_names='tokens',
+    tracker = ForeignKeyField(Tracker, related_names='tokens',
                             cascade=True)
 
-
 class Instance(BaseModel):
+
     id = CharField(index=True, unique=True)
     created = DateTimeField(default=datetime.datetime.now)
     state = IntegerField(choices=(INSTANCE_STATES.values()))
