@@ -1,3 +1,7 @@
+Flask==0.9
+Flask-RESTful==0.2.1
+Jinja2==2.6
+Werkzeug==0.8.3
 act-as-executable==1.0
 argparse==1.2.1
 distribute==0.6.24
@@ -5,6 +9,11 @@ envoy==0.0.2
 ipython==0.13.2
 lxc4u==0.0.4
 overlay4u==0.0.4
+peewee==2.1.1
+pycrypto==2.6
 pylxc==0.0.3
 subwrap==0.1.0
+tormenta-agent==0.1
+tormenta-core==0.1
+tormenta-tracker==0.1
 wsgiref==0.1.2
