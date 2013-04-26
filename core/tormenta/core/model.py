@@ -6,6 +6,9 @@ __author__ = 'Jorge Niedbalski R. <jnr@pyrosome.org>'
 import logging
 import datetime
 import hashlib
+import hmac
+import uuid
+
 
 from .lxc import INSTANCE_STATES
 from .config import settings
@@ -24,8 +27,9 @@ class BaseModel(Model):
 
 
 class Agent(BaseModel):
-    public_key = TextField() 
-    
+    public_key = TextField()
+
+
 class Tracker(BaseModel):
     public_key = CharField(primary_key=True)
 
@@ -41,6 +45,7 @@ class Tracker(BaseModel):
             tracker = cls.create(public_key=hashed)
         return tracker
 
+
 class TrackerAgent(BaseModel):
     agent = ForeignKeyField(Agent)
     tracker = ForeignKeyField(Tracker)
@@ -49,51 +54,59 @@ class TrackerAgent(BaseModel):
 class Token(BaseModel):
     value = CharField(index=True, unique=True)
     created = DateTimeField(default=datetime.datetime.now)
-    valid_until = DateTimeField(default=datetime.datetime.now() + 
+    valid_until = DateTimeField(default=datetime.datetime.now() +
                                 datetime.timedelta(days=30))
     tracker = ForeignKeyField(Tracker, related_names='tokens',
                             cascade=True)
 
+
 class Instance(BaseModel):
 
-    id = CharField(index=True, unique=True)
+    instance_id = CharField(index=True, unique=True, primary_key=True)
     created = DateTimeField(default=datetime.datetime.now)
     state = IntegerField(choices=(INSTANCE_STATES.values()))
 
     token = ForeignKeyField(Token, related_names='instances',
                             cascade=True)
 
+    @classmethod
+    def generate_instance_id(cls, token):
+        uid = hashlib.sha256(uuid.uuid4().__str__()).hexdigest()
+        instance_id = hmac.new(str(token.value),
+                            uid,
+                            hashlib.sha256).hexdigest()
+        return instance_id
+
 
 class Usage(BaseModel):
+
     unit  = CharField(choices=('MB', 'KB', 'Bytes'))
     value = FloatField()
-    instance = ForeignKeyField(Instance, related_name='usages', 
+    instance = ForeignKeyField(Instance, related_name='usages',
                                cascade=True)
 
 
-class Resource(BaseModel):
-    kind = CharField(choices=('disk', 'memory', 'swap', 'shared', 'cores'))
-    identifier = TextField()
-    
-    instance = ForeignKeyField(Instance, related_names='resources', 
+class InstanceResource(BaseModel):
+
+    kind = CharField(choices=('disk', 'memory', 'swap', 'shared', 'cores', 'bw_in', 'bw_out'))
+    value = FloatField()
+
+    instance = ForeignKeyField(Instance, related_names='resources',
                                cascade=True)
 
+
+models = [Usage, InstanceResource, Instance, Token, Agent, Tracker, TrackerAgent]
 
 def setup_database():
     try:
-        settings.node.database.conn.connect()
-
+        db = settings.node.database.conn
+	db.connect()
         #create tables on the database
-        create_model_tables([Usage, 
-                         Resource, 
-                         Instance, 
-                         Token, 
-                         Agent, 
-                         Tracker, 
-                         TrackerAgent], fail_silently=True)
+        create_model_tables(models, fail_silently=True)
     except Exception as ex:
         logger.error(ex.message)
         raise
+    return db
 
 
-setup_database()
+db = setup_database()
