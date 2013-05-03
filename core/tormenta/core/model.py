@@ -8,7 +8,7 @@ import datetime
 import hashlib
 import hmac
 import uuid
-
+import operator
 
 from .lxc import INSTANCE_STATES
 from .config import settings
@@ -59,9 +59,12 @@ class Token(BaseModel):
     tracker = ForeignKeyField(Tracker, related_names='tokens',
                             cascade=True)
 
+    @classmethod
+    def random(cls):
+        rand = uuid.uuid4().__str__()
+        return hashlib.sha256(rand).hexdigest()
 
 class Instance(BaseModel):
-
     instance_id = CharField(index=True, unique=True, primary_key=True)
     created = DateTimeField(default=datetime.datetime.now)
     state = IntegerField(choices=(INSTANCE_STATES.values()))
@@ -77,9 +80,34 @@ class Instance(BaseModel):
                             hashlib.sha256).hexdigest()
         return instance_id
 
+    def hydrate(self, cb, i_fields, r_fields):
+        self.resources = []
+        for resource in self.instanceresource_set:
+            self.resources.append(cb(resource, r_fields))
+        return cb(self, i_fields)
+
+    def has_resources(self, filters):
+        filter_conditions = []
+
+        resources = InstanceResource.select().where(
+            InstanceResource.instance == self)
+        
+        for f in filters:
+            (kind, value) = f
+            filter_conditions.append(
+                (InstanceResource.kind == kind) &
+                (InstanceResource.value <= value))
+
+        resources = resources.where(reduce(operator.or_, 
+                                           filter_conditions))
+        count = 0
+        for resource in resources:
+            count += 1
+
+        return  count >= len(filters)
+                
 
 class Usage(BaseModel):
-
     unit  = CharField(choices=('MB', 'KB', 'Bytes'))
     value = FloatField()
     instance = ForeignKeyField(Instance, related_name='usages',
@@ -87,15 +115,16 @@ class Usage(BaseModel):
 
 
 class InstanceResource(BaseModel):
-
-    kind = CharField(choices=('disk', 'memory', 'swap', 'shared', 'cores', 'bw_in', 'bw_out'))
+    kind = CharField(choices=('disk', 'memory', 'swap', 
+                              'shared', 'cores', 'bw_in', 'bw_out'))
     value = FloatField()
 
     instance = ForeignKeyField(Instance, related_names='resources',
                                cascade=True)
 
 
-models = [Usage, InstanceResource, Instance, Token, Agent, Tracker, TrackerAgent]
+models = [Usage, InstanceResource, Instance, Token, 
+          Agent, Tracker, TrackerAgent]
 
 def setup_database():
     try:
