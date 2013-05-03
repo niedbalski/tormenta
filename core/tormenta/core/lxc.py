@@ -17,7 +17,8 @@ INSTANCE_STATES = {
     'STARTED': 4,
     'STOPPED': 5,
     'STOPPING': 6,
-    'REQUESTED': 7
+    'REQUESTED': 7,
+    'DELETED': 8
 }
 
 
