@@ -1,10 +1,12 @@
+from tormenta.core.config import settings
+
 import requests
 import json
 import pprint
 import sys
 
 headers = {
-        'X-Access-Token': 'af27cb2fa64017f21f36fc55b289ceb8ec41bd2ea5b0f753726d0507932b1407',
+        'X-Access-Token': '5c02b8228f8fb8fbf614104eb62bf4a8a2a00955dab54ae5de7321aa2f917eb7',
         'Content-Type': 'application/json'
 }
 
@@ -21,15 +23,34 @@ data = {
   'memory': 128.0
 }
 
-#r = requests.post('http://127.0.0.1:5000/instance', data=json.dumps(data), headers=headers)
-#print r.json()
+with open('/home/aktive/src/tormenta/test.pub') as key:
+    readed = key.read()
 
+public_key = {
+  'public_key': readed
+}
+
+r = requests.post('%s/api/v1/public_key' % settings.agent.listen.uri, 
+		   data=json.dumps(public_key), headers=headers)
+
+r = r.json()
+
+pkey = r['keys'][0]['public_key_id']
+data.update({'public_key_id': pkey})
+
+r = requests.post('%s/api/v1/instance' % settings.agent.listen.uri, 
+		   data=json.dumps(data), headers=headers)
+print r.json()
 
 #r = requests.get('http://127.0.0.1:5000/instance?all=true&state=%s&%s' % (sys.argv[1], sys.argv[2]), headers=headers)
 #pprint.pprint(r.json())
 #print r.status_code
 
 
-r = requests.delete('http://127.0.0.1:5000/instance?all=true&instance_ids=[%s]' % sys.argv[1], headers=headers)
-pprint.pprint(r.json())
-print r.status_code
+#r = requests.delete('http://127.0.0.1:5000/instance?all=true&instance_ids=[%s]' % sys.argv[1], headers=headers)
+#pprint.pprint(r.json())
+#print r.status_code
+
+
+#r = requests.get('http://127.0.0.1:5000/agent', headers=headers)
+#pprint.pprint(r.json())

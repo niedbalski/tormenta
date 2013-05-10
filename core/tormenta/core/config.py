@@ -9,9 +9,14 @@ from peewee import SqliteDatabase
 import yaml
 import logging
 import os
+import urlparse
 
 _HERE = os.path.abspath(os.path.dirname(__file__))
 _DEFAULT_CONFIG = os.path.join(_HERE, 'config.yml')
+
+
+logger = logging.getLogger(__name__)
+
 
 class Resource(object):
     def __init__(self, name):
@@ -26,7 +31,6 @@ class ConfigResource(object):
     _required = []
 
     def __init__(self, options):
-        self.logger = logging.getLogger('tormenta.core.config')
         self.validate(options)
 
     def validate(self, options):
@@ -35,8 +39,8 @@ class ConfigResource(object):
         for required in self._required:
             (name, klass) = required
             if not name in entries:
-                raise ConfigException('Not found required %s' 
-                                ' entry in node declaration' % name)
+                raise ConfigException('Not found required %s'
+                                ' entry in declaration' % name)
             setattr(self, name, klass(options[name]))
 
 
@@ -46,70 +50,42 @@ class KeyHandler:
             raise ConfigException('Not found required key %s' % path)
         self.path = path
 
+
 class TrackerHandler:
     def __init__(self, options):
         self.options = options
 
+
 class DataBaseHandler:
     def __init__(self, options):
-        if not 'uri' in options:
-            raise ConfigException('Please specify a uri path for your database')
         try:
-            self.conn = SqliteDatabase(options['uri'], threadlocals=True)
+            self.connection = SqliteDatabase(options, threadlocals=True)
         except Exception as ex:
-            raise ConfigException('Invalid provided database %s' % 
-                                  options['uri'])
-
-class RestHandler(ConfigResource):
-
-    _required = [ ('port', int), 
-                 ('notifications', bool),
-                 ('token', bool) ]
-
-    def __init__(self, options):
-        ConfigResource.__init__(self, options)
+            logger.error(ex.message)
+            raise ConfigException('Invalid provided database %s' %
+                                  options)
 
 
-class NodeHandler(ConfigResource):
-    _required = [ ('tracker', TrackerHandler),
-                  ('database', DataBaseHandler),
-                  ('key', KeyHandler),
-                  ('rest', RestHandler) ]
+class ResourcesHandler(ConfigResource):
 
-    def __init__(self, options):
-        ConfigResource.__init__(self, options)
-
-
-class Config(object):
-    """
-    Main configuration handler
-    """
     DEFAULT_MEMORY_SIZE = 512.00
     DEFAULT_CPU_CORES = [ 0 ]
     DEFAULT_SWAP_SIZE = 512.00
     DEFAULT_DISK_SIZE =  1024.00
     DEFAULT_CPU_SHARES = 2048.00
 
-    ( DEFAULT_NETWORK_IN, 
+    ( DEFAULT_NETWORK_IN,
       DEFAULT_NETWORK_OUT ) = ( 1024.00, 1024.00 )
 
-    _required = [ 'resources', 'node' ]
 
-    def __init__(self, path=None):
-
-        if not path:
-            path = _DEFAULT_CONFIG
-            
-        with open(path) as configuration:
-            self._config = yaml.load(configuration.read())
-
-        for required in self._required:
-            if not required in self._config:
-                raise ConfigException('Invalid configuration: '
-                                      '%s section not found' % required)
-
-        self.load_resources(self._config['resources'].items())
-        self.load_node(self._config['node'])
+    def __init__(self, resources):
+        try:
+            for name, resource in resources.items():
+                getattr(self, 's_%s' % name)(resource)
+        except Exception as ex:
+            logger.warn(ex.message)
+            raise ConfigException('Cannot load resources '
+                                  'section from configuration')
 
     def iterate_options(self, obj, options, skip=None):
         for option, value in options.items():
@@ -119,19 +95,6 @@ class Config(object):
                     values = getattr(self, validator)(value)
                 setattr(obj, option, value)
         return obj
-
-    def load_node(self, options):
-        self.node = NodeHandler(options)
-            
-    def load_resources(self, resources):
-        try:
-            for resource in resources:
-                (name, options) = resource
-                getattr(self, 's_%s' % name)(options)
-        except Exception as ex:
-            self.logger.warn(ex.message)
-            raise ConfigException('Cannot load resources' 
-                                  'section from configuration')
 
     @property
     def memory(self):
@@ -216,7 +179,6 @@ class Config(object):
                 (self._network.limit_in,
                  self._network.limit_out) = (float(options['limit']['in']),
                                              float(options['limit']['out']))
-        
         self._network = self.iterate_options(self._network, options,
                                                     skip=('limit'))
         return self._network
@@ -236,10 +198,97 @@ class Config(object):
             self._disk.limit = self.DEFAULT_SWAP_SIZE
         else:
             self._disk.limit = float(options['limit'])
-        
         self._disk = self.iterate_options(self._disk, options,
                                                 skip=('limit'))
         return self._disk
+
+
+class ListenHandler(ConfigResource):
+
+    def __init__(self, options):
+        try:
+            parsed = urlparse.urlparse(options)
+        except:
+            raise ConfigException('Invalid provided uri for listen: %s' %
+                        options)
+
+        for attr_name in dir(parsed):
+            if not attr_name.startswith('__'):
+                setattr(self, attr_name, getattr(parsed, attr_name))
+        self.uri = options
+
+
+class DriverHandler:
+    def __init__(self, options):
+        self.value = options
+    def __str__(self):
+        return self.value
+
+
+class GlobalHandler(ConfigResource):
+    _required = [ ('api_version', int), 
+                  ('database', DataBaseHandler) ]
+
+    def __init__(self, options):
+        ConfigResource.__init__(self, options)
+
+
+class AgentHandler(ConfigResource):
+
+    _required = [ ('enabled', bool),
+                  ('tracker', TrackerHandler),
+                  ('resources', ResourcesHandler),
+                  ('listen', ListenHandler) ]
+
+    def __init__(self, options):
+        ConfigResource.__init__(self, options)
+
+
+class TrackerHandler(ConfigResource):
+
+    _required = [ ('enabled', bool),
+                  ('listen', ListenHandler) ]
+
+    def __init__(self, options):
+        ConfigResource.__init__(self, options)
+
+
+class Config(object):
+    """
+       Main configuration handler
+    """
+
+    _required = [ 'global' ]
+
+    def __init__(self, path=None):
+
+        if not path:
+            path = _DEFAULT_CONFIG
+
+        with open(path) as configuration:
+            self._config = yaml.load(configuration.read())
+
+        for required in self._required:
+            if not required in self._config:
+                raise ConfigException('Invalid configuration: '
+                                      '%s section not found' % required)
+
+        self.load_global_options(self._config['global'])
+
+        if 'agent' in self._config:
+            self.load_agent(self._config['agent'])
+
+        if 'tracker' in self._config:
+            self.load_tracker(self._config['tracker'])
+
+    def load_agent(self, options):
+        self.agent = AgentHandler(options)
+
+    def load_tracker(self, options):
+        self.tracker = TrackerHandler(options)
+
+    def load_global_options(self, options):
+        self.options = GlobalHandler(options)
 
 
 settings = Config()

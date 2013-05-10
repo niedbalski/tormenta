@@ -1,35 +1,27 @@
-node:
-        tracker:   [  "master.node.pyrosome.org:5392" ]
-        key: '/home/aktive/.ssh/openstack.pub'
-        rest:
-            port: 8080
-            notifications: true
-            token: true
-
-        database:
-            uri: 'tormenta.db'
-resources:
-
-        disk:
-            limit: 4096
-            type: 'lvm | image'
-            lvm: 
-                volume: 'vol01'
-            image:
-                path: '/images'
-
-        cpu: 
-            cores: [ 0, 1, 2 ]
-            limit:
-                    shares: 2048
-
-        swap:
-            limit: 1024
-
-        memory:
-            limit: 1024
-
-        network:
-            limit:
-                in: 1024
-                out: 1024
+global:
+    api_version: 1
+    database: 'tormenta.db'
+agent:
+  enabled: True
+  listen: 'http://0.0.0.0:8080'
+  tracker:   [  
+  "http://localhost:8090" 
+  ]
+  resources:
+    disk:
+      limit: 4096
+      path: '/images'
+    cpu: 
+      limit: 
+        cores: 3
+    swap:
+      limit: 1024
+    memory:
+      limit: 1024
+    network:
+      limit:
+        in: 1024
+        out: 1024
+tracker:
+  enabled: True
+  listen: 'http://0.0.0.0:8090'

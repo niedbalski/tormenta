@@ -26,10 +26,9 @@ def has_access_token(controller):
 
         if args[header] is None:
             return abort(401)
-
-        token = Token.get(value=args[header])        
-
-        if not token:
+        try:
+            token = Token.get(value=args[header])
+        except:
             return abort(401)
 
         kwargs['token'] = token
