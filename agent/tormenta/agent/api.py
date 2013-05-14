@@ -3,96 +3,78 @@
 __author__ = 'Jorge Niedbalski R. <jnr@pyrosome.org>'
 
 from tormenta.core.config import settings
-from tormenta.core.decorators import has_access_token
-from tormenta.core.model import (db, Token, PublicKey,
+from tormenta.core.tasks import InstanceTask
+
+from tormenta.core.decorators import has_public_key
+from tormenta.core.model import (db, PublicKey,
                                  Instance,
                                  InstanceResource as InstanceResourceModel)
+
 from tormenta.agent import (initialize, params)
 
 from flask import Flask, request
-from flask.ext.restfuThe cl import (Resource, Api,
-                                    marshal_with, marshal, abort)
+from flask.ext.restful import (Resource, Api, marshal_with, marshal, abort)
+
+import beanstalkc
 import logging
 
 logger = logging.getLogger('tormenta.agent.api')
-
 
 app = Flask(__name__)
 api = Api(app, prefix='/api/v%d' % settings.options.api_version)
 
 
-def marshal_and_count(n, r, f):
+def marshal_and_count(n, r, f=None, **other):
     if not isinstance(r, list):
         r = [r]
-    r = map(lambda q: marshal(q, f), r)
+    if f:
+        r = map(lambda q: marshal(q, f), r)
 
-    return dict({'count': len(r), '%s' % n: r})
-
-
-class TokenResource(Resource):
-
-    params = params.Token()
-
-    def _get_access_token(self):
-        return Token.create(value=Token.encode())
-
-    def get(self):
-        return marshal(self._get_access_token(), self.params.fields)
+    d = dict({'count': len(r), '%s' % n: r})
+    for k, v in other.items():
+        d.update({k: v})
+    return d
 
 
 class PublicKeyResource(Resource):
 
-    method_decorators = [has_access_token]
     params = params.PublicKey()
 
-    def get(self, *args, **kwargs):
-        (args, token) = (self.params.get, kwargs.get('token'))
-
-        keys = PublicKey.select().where(PublicKey.token == token)
-
-        if args['public_key_id']:
-            keys = keys.where(PublicKey.public_key_id == args['public_key_id'])
-
-        return marshal_and_count('keys', key, self.params.fields)
+    @has_public_key
+    def get(self, public_key):
+        return marshal_and_count('keys', public_key, f=self.params.fields)
 
     def post(self, *args, **kwargs):
-        (args, token) = (self.params.post, kwargs.get('token'))
-
-        pkey_param = args['public_key']
-        pkey_id = PublicKey.encode(token, pkey_param)
+        public_key_id = PublicKey.encode(self.params.post['public_key'])
 
         try:
-            key = PublicKey.select().where(PublicKey.token == token).where(
-                PublicKey.public_key_id == pkey_id).get()
+            key = PublicKey.get(public_key_id)
         except:
-            key = PublicKey.create(public_key_id=pkey_id,
-                                   raw=pkey_param, token=token)
+            key = PublicKey.create(public_key_id=public_key_id,
+                                   raw=self.params.post['public_key'])
 
-        return marshal_and_count('keys', key, self.params.fields)
+        return marshal_and_count('keys', key, f=self.params.fields)
 
 
 class InstanceResource(Resource):
-    method_decorators = [has_access_token]
+
     params = params.Instance()
 
-    def get(self, *args, **kwargs):
+    @has_public_key
+    def get(self, public_key):
         """
            List all instances
         """
-        (args, token) = (self.params.get, kwargs.get('token'))
+        instances = Instance.select().where(
+            Instance.public_key == public_key)
 
-        instances = Instance.select()
-
-        if args['state']:
-            instances = instances.where(Instance.state == args['state'])
-
-        if not args['all']:
+        if self.params.get['state'] is not None:
             instances = instances.where(
-                Instance.token == kwargs.get('token'))
+            Instance.state == self.params.get['state'])
 
         m_instances = []
         for instance in instances:
-            resource_filters = args.get('resource_filter', None)
+            resource_filters = self.params.get.get('resource_filter', None)
             if resource_filters:
                 if instance.has_resources(resource_filters):
                     m_instances.append(instance)
@@ -104,18 +86,14 @@ class InstanceResource(Resource):
                           self.params.resource.fields),
                           m_instances)
 
-        return count('instances', m_instances)
+        return marshal_and_count('instances', m_instances)
 
-    def delete(self, *args, **kwargs):
+    @has_public_key
+    def delete(self, public_key):
         """
             Receives a request for destroy a running/requested instance
         """
-        (args, token) = (self.params.delete, kwargs.get('token'))
-
-        instances = Instance.update(state='REMOVED').where(
-            Instance.token == kwargs.get('token'))
-
-        if args['state']:
+        if self.params.get['state']:
             instances = instances.where(Instance.state == args['state'])
 
         instance_ids = args.get('instance_ids', None)
@@ -129,19 +107,23 @@ class InstanceResource(Resource):
         affected = instances.execute()
         return affected
 
-    def post(self, *args, **kwargs):
+    @has_public_key
+    def post(self, public_key):
         """
           Receives a request for a new Instance
         """
         try:
-            instance = Instance.create_from_args(self.params.post, kwargs)
+            instance = Instance.create_from_args(self.params.post, public_key)
+            job_id = InstanceTask().start(instance.instance_id)
         except Exception as ex:
             logger.error(ex.message)
             return abort(500)
 
-        return marshal_and_count('instances', instance, self.params.fields)
+        return marshal_and_count('instances',
+                                 instance,
+                                 f=self.params.fields,
+                                 job_id=job_id)
 
 
-api.add_resource(TokenResource, '/token')
 api.add_resource(PublicKeyResource, '/public_key')
 api.add_resource(InstanceResource, '/instance')

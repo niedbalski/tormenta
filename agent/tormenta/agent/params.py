@@ -11,7 +11,7 @@ from flask.ext.restful import fields, types, reqparse
 import re
 
 
-def parse_args(request_parameter_map, all_valid=True):    
+def parse_args(request_parameter_map, all_valid=True):
     parser = reqparse.RequestParser()
     add_arg = parser.add_argument
 
@@ -21,12 +21,14 @@ def parse_args(request_parameter_map, all_valid=True):
     args = parser.parse_args()
     return args
 
+
 def parse_list(value):
     regex = re.compile('[^,;\s]+')
     matched = regex.findall(re.sub('[\[|\]]', '', value))
     if len(matched):
         return matched
     return None
+
 
 class PublicKey:
 
@@ -43,7 +45,7 @@ class PublicKey:
             'location': 'json'
         }
     }
-    
+
     @property
     def post(self):
         return parse_args(self._post)
@@ -114,13 +116,6 @@ class Instance:
     }
 
     _post = {
-        'public_key_id': {
-            'type': str,
-            'help': 'Please specify a valid public_key_id',
-            'required': True,
-            'location': 'json'
-        },
-
         'cores': {
             'type': float,
             'help': 'Please specify required amount of CPU cores',

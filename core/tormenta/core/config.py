@@ -225,8 +225,15 @@ class DriverHandler:
         return self.value
 
 
+class BeanstalkHandler:
+    def __init__(self, options):
+        for k, v in options.items():
+            setattr(self, k, v)
+
+
 class GlobalHandler(ConfigResource):
-    _required = [ ('api_version', int), 
+    _required = [ ('api_version', int),
+                  ('beanstalk', BeanstalkHandler),
                   ('database', DataBaseHandler) ]
 
     def __init__(self, options):

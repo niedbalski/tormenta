@@ -1,12 +1,12 @@
 <domain type='kvm'>
-  <name>{{ instance_name }}</name>
-  <memory>{{ resource_memory }}</memory>
-  <currentMemory>{{ resource_memory }}</currentMemory>
-  <vcpu>{{ resource_vcpu }}</vcpu>
+  <name>{{ instance_id }}</name>
+  <memory>{{ memory }}</memory>
+  <currentMemory>{{ memory }}</currentMemory>
+  <vcpu>{{ vcpus }}</vcpu>
   <os>
     <type arch='i686' machine='pc'>hvm</type>
     <boot dev='hd'/>
-    <kernel>{{ image_vmlinuz }}</kernel>
+    <kernel>{{ vmlinuz }}</kernel>
     <cmdline>root=/dev/vda ro init=/usr/lib/cloud-init/uncloud-init root=/dev/vda ds=nocloud-net;s{{ agent_metadata }}</cmdline>
   </os>
   <features>
@@ -19,7 +19,7 @@
   <devices>
     <emulator>/usr/bin/kvm</emulator>
     <disk type='file' device='disk'>
-      <source file='/PATHTO/disk.img'/>
+      <source file='{{ disk_image }}'/>
       <target dev='vda' bus='virtio'/>
     </disk>
     <interface type='network'>

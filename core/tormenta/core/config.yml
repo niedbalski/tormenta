@@ -1,12 +1,19 @@
 global:
     api_version: 1
     database: 'tormenta.db'
+
+    beanstalk: 
+        host: '127.0.0.1'
+        port: 11300
+
 agent:
+
   enabled: True
   listen: 'http://0.0.0.0:8080'
   tracker:   [  
   "http://localhost:8090" 
   ]
+
   resources:
     disk:
       limit: 4096
@@ -22,6 +29,7 @@ agent:
       limit:
         in: 1024
         out: 1024
+
 tracker:
   enabled: True
   listen: 'http://0.0.0.0:8090'

@@ -1,37 +1,35 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*- 
 
-from flask.ext.restful import reqparse, abort
-from tormenta.core.model import Token
+from flask.ext.restful import reqparse, abort, request
+from tormenta.core.model import PublicKey
 
 __author__ = 'Jorge Niedbalski R. <jnr@pyrosome.org>'
 
 
-def has_access_token(controller):
-    '''
-    Checks if request has access-token header
-    '''
-    
-    header = 'X-Access-Token'
+parser = reqparse.RequestParser()
 
-    def wrap(*args, **kwargs):
 
-        parser = reqparse.RequestParser()
-        parser.add_argument(header, 
-                            type=str, 
-                            location='headers', 
-                            help='Access token for authentication')
+def has_public_key(controller):
+
+    header = 'Public-Key-Id'
+
+    def wrapper(self, *args, **kwargs):
+        parser.add_argument(header,
+                            type=str,
+                            location='headers',
+                            help='Specify %s on headers' % header)
 
         args = parser.parse_args()
 
-        if args[header] is None:
+        if not (header in args and args[header] is not None):
             return abort(401)
         try:
-            token = Token.get(value=args[header])
+            public_key = PublicKey.select().where(
+                PublicKey.public_key_id == args[header]).get()
         except:
             return abort(401)
 
-        kwargs['token'] = token
-        return controller(*args, **kwargs)
+        return controller(self, public_key)
 
-    return wrap
+    return wrapper

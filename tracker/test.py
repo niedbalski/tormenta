@@ -6,19 +6,13 @@ import pprint
 import sys
 
 headers = {
-        'X-Access-Token': '5c02b8228f8fb8fbf614104eb62bf4a8a2a00955dab54ae5de7321aa2f917eb7',
-        'Content-Type': 'application/json'
+    'Content-Type': 'application/json'
 }
-
-#r = requests.get('http://127.0.0.1:5000/instance', headers=headers)
-#print r.json()
-
 
 data = {
   'disk': 5.0,
-  'caca': 5.5,
-  'bw_in' : 1024.0, 
-  'cores': 2.0,
+  'bw_in' : 1024.0,
+  'cores': 1.0,
   'bw_out' : 1024.0,
   'memory': 128.0
 }
@@ -30,17 +24,39 @@ public_key = {
   'public_key': readed
 }
 
-r = requests.post('%s/api/v1/public_key' % settings.agent.listen.uri, 
-		   data=json.dumps(public_key), headers=headers)
+r = requests.post('%s/api/v1/public_key' % settings.agent.listen.uri,
+            data=json.dumps(public_key), headers=headers)
 
 r = r.json()
 
 pkey = r['keys'][0]['public_key_id']
-data.update({'public_key_id': pkey})
+
+headers.update({'public_key_id': pkey})
+
+print headers
 
 r = requests.post('%s/api/v1/instance' % settings.agent.listen.uri, 
-		   data=json.dumps(data), headers=headers)
-print r.json()
+            data=json.dumps(data), headers=headers)
+
+instance = r.json()
+
+#print instance
+instance_id = instance['instances'][0]['instance_id']
+
+print 'Requesting for ... %s' % instance_id
+
+r = requests.get('%s/api/v1/instance?instance_ids=[%s]' % 
+            (settings.agent.listen.uri, instance_id), headers=headers)
+
+#print r.json()
+
+
+print 'Requesting for .. %s with memory:%s' % (instance_id, sys.argv[1])
+
+r = requests.get('%s/api/v1/instance?instance_ids=[%s]&resource_filter=memory:%s' % 
+            (settings.agent.listen.uri, instance_id, sys.argv[1]), headers=headers)
+#print r.json()
+
 
 #r = requests.get('http://127.0.0.1:5000/instance?all=true&state=%s&%s' % (sys.argv[1], sys.argv[2]), headers=headers)
 #pprint.pprint(r.json())
